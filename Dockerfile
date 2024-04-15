@@ -13,7 +13,6 @@ EXPOSE 8080
 ENV PORT 8080
 
 COPY --from=builder /go/bin/chat /chat
-COPY --from=builder /app/.env /
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 

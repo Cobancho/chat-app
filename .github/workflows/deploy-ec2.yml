@@ -1,0 +1,57 @@
+name: Pushes NextJS image to ECR and deploys to EC2
+on:
+  push:
+    tags:
+      - "v*.*.*"
+jobs:
+  Build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set tag env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: sa-east-1
+
+       - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push docker image
+        uses: docker/build-push-action@v5
+        with:
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/chat-repository:${{ env.RELEASE_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trigger the instance script
+        id: trigger-ec2-script
+        uses: peterkimzz/aws-ssm-send-command@master
+        env:
+          CHAT_IMAGE: ${{ steps.login-ecr.outputs.registry }}/chat-repository:${{ env.RELEASE_VERSION }}
+
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          instance-ids: ${{ secrets.INSTANCE_ID }}
+
+          working-directory: /home/ubuntu/sistema-maika
+          command: |
+            /bin/sh update-chat.sh $CHAT_IMAGE
+            docker-compose stop maika-app
+            docker-compose up -d maika-app
+            docker image prune -af
