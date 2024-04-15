@@ -1,12 +1,12 @@
-FROM --platform=linux/arm64/v8 golang:1.22 AS builder
+FROM golang:1.22 AS builder
 
 WORKDIR /app
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o /go/bin/chat
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /go/bin/chat
 
-FROM --platform=linux/arm64/v8 scratch
+FROM scratch
 
 EXPOSE 8080
 
